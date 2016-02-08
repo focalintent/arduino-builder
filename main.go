@@ -351,14 +351,22 @@ func main() {
 				return
 			}
 
+			binaries := struct {
+				Elf []byte `json:"elf,omitempty"`
+				Bin []byte `json:"bin,omitempty"`
+				Hex []byte `json:"hex,omitempty"`
+			}{}
+
 			elfPath := filepath.Join(*buildPathFlag, json.Sketch.MainFile.Name+".elf")
-			elf, _ := ioutil.ReadFile(elfPath)
+			binaries.Elf, _ = ioutil.ReadFile(elfPath)
+
+			binPath := filepath.Join(*buildPathFlag, json.Sketch.MainFile.Name+".bin")
+			binaries.Bin, _ = ioutil.ReadFile(binPath)
 
 			hexPath := filepath.Join(*buildPathFlag, json.Sketch.MainFile.Name+".hex")
-			hex, _ := ioutil.ReadFile(hexPath)
+			binaries.Hex, _ = ioutil.ReadFile(hexPath)
 
-			c.JSON(200, gin.H{"out": logger.Out(), "elf": elf, "hex": hex})
-
+			c.JSON(200, gin.H{"out": logger.Out(), "binaries": binaries})
 		})
 
 		router.Run(":" + *listenFlag)
