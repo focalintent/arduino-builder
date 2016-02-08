@@ -37,6 +37,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -44,7 +45,9 @@ import (
 	"arduino.cc/builder/constants"
 	"arduino.cc/builder/gohasissues"
 	"arduino.cc/builder/i18n"
+	"arduino.cc/builder/types"
 	"arduino.cc/builder/utils"
+	"github.com/gin-gonic/gin"
 	"github.com/go-errors/errors"
 )
 
@@ -76,6 +79,7 @@ const FLAG_LOGGER_HUMAN = "human"
 const FLAG_LOGGER_MACHINE = "machine"
 const FLAG_VERSION = "version"
 const FLAG_VID_PID = "vid-pid"
+const FLAG_LISTEN = "listen"
 
 type slice []string
 
@@ -119,6 +123,7 @@ var warningsLevelFlag *string
 var loggerFlag *string
 var versionFlag *bool
 var vidPidFlag *string
+var listenFlag *string
 
 func init() {
 	compileFlag = flag.Bool(FLAG_ACTION_COMPILE, false, "compiles the given sketch")
@@ -141,6 +146,7 @@ func init() {
 	loggerFlag = flag.String(FLAG_LOGGER, FLAG_LOGGER_HUMAN, "Sets type of logger. Available values are '"+FLAG_LOGGER_HUMAN+"', '"+FLAG_LOGGER_MACHINE+"'")
 	versionFlag = flag.Bool(FLAG_VERSION, false, "prints version and exits")
 	vidPidFlag = flag.String(FLAG_VID_PID, "", "specify to use vid/pid specific build properties, as defined in boards.txt")
+	listenFlag = flag.String(FLAG_LISTEN, "", "specify to listen for web request at a certain host")
 }
 
 func main() {
@@ -310,6 +316,52 @@ func main() {
 		err = builder.RunParseHardwareAndDumpBuildProperties(context)
 	} else if *preprocessFlag {
 		err = builder.RunPreprocess(context)
+	} else if *listenFlag != "" {
+		router := gin.Default()
+
+		router.POST("/compile", func(c *gin.Context) {
+			logger := i18n.WebLogger{}
+			logger.Init()
+			context[constants.CTX_LOGGER] = &logger
+
+			var json struct {
+				Sketch types.Sketch `json:"sketch"`
+				Fqbn   string       `json:"fqbn"`
+			}
+
+			err := c.BindJSON(&json)
+
+			if err != nil {
+				c.JSON(400, gin.H{"error": "Malformed JSON", "message": err.Error()})
+				return
+			}
+
+			if json.Fqbn == "" {
+				c.JSON(400, gin.H{"error": "Malformed JSON", "message": "Missing fqbn property"})
+				return
+			}
+
+			context[constants.CTX_SKETCH] = &json.Sketch
+			context[constants.CTX_FQBN] = json.Fqbn
+
+			err = builder.RunBuilder(context)
+
+			if err != nil {
+				c.JSON(500, gin.H{"out": logger.Out(), "error": err.Error()})
+				return
+			}
+
+			elfPath := filepath.Join(*buildPathFlag, json.Sketch.MainFile.Name+".elf")
+			elf, _ := ioutil.ReadFile(elfPath)
+
+			hexPath := filepath.Join(*buildPathFlag, json.Sketch.MainFile.Name+".hex")
+			hex, _ := ioutil.ReadFile(hexPath)
+
+			c.JSON(200, gin.H{"out": logger.Out(), "elf": elf, "hex": hex})
+
+		})
+
+		router.Run(":" + *listenFlag)
 	} else {
 		if flag.NArg() == 0 {
 			fmt.Fprintln(os.Stderr, "Last parameter must be the sketch to compile")
