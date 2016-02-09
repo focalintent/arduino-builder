@@ -41,7 +41,7 @@ This tool generates function prototypes and gathers library paths, providing `gc
 
 * `-vid-pid`: when specified, VID/PID specific build properties are used, if boards supports them.
 
-Final mandatory parameter is the sketch to compile (except when using the option `-listen:3000`).
+Final mandatory parameter is the sketch to compile.
 
 ### What is and how to use build.options.json file
 
@@ -53,9 +53,34 @@ You can save this file locally and use it instead of specifying `-hardware`, `-t
 
 See [Doing continuous integration with arduino builder](https://github.com/arduino/arduino-builder/wiki/Doing-continuous-integration-with-arduino-builder/).
 
+### Building from source
+
+You need [Go 1.4.3](https://golang.org/dl/#go1.4.3).
+
+Repo root contains the script `setup_go_env_vars`. Use it as is or as a template for setting up Go environment variables.
+
+To install `codereview/patch` you have to install [Mercurial](https://www.mercurial-scm.org/) first.
+
+Once done, run the following commands:
+
+```
+go get github.com/go-errors/errors
+go get github.com/stretchr/testify
+go get github.com/jstemmer/go-junit-report
+go get golang.org/x/codereview/patch
+go get golang.org/x/tools/cmd/vet
+go build
+```
+
 ### Web Api
 
-With the option `listen=3000` the builder will open a web server listening for requests to the /compile endpoint.
+You can choose to compile the builder with the -api option:
+
+```bash
+go build -tags 'api'
+```
+
+Then if you launch it with the option `listen=3000` the builder will open a web server listening for requests to the /compile endpoint.
 
 Here's how to request the compilation of the simplest sketch possible:
 
@@ -99,25 +124,6 @@ And here's the response (the actual response will be much bigger, but the struct
         ...
     ]
 }
-```
-
-### Building from source
-
-You need [Go 1.4.3](https://golang.org/dl/#go1.4.3).
-
-Repo root contains the script `setup_go_env_vars`. Use it as is or as a template for setting up Go environment variables.
-
-To install `codereview/patch` you have to install [Mercurial](https://www.mercurial-scm.org/) first.
-
-Once done, run the following commands:
-
-```
-go get github.com/go-errors/errors
-go get github.com/stretchr/testify
-go get github.com/jstemmer/go-junit-report
-go get golang.org/x/codereview/patch
-go get golang.org/x/tools/cmd/vet
-go build
 ```
 
 ### TDD
